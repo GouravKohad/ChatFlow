@@ -75,7 +75,27 @@ export function useSocket() {
       console.error('Socket.io connection error:', error);
       toast({
         title: "Connection Error",
-        description: "Failed to connect to chat server",
+        description: "Unable to connect to chat server. Please check your internet connection.",
+        variant: "destructive",
+      });
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log('Reconnected to server after', attemptNumber, 'attempts');
+      toast({
+        title: "Reconnected",
+        description: "Successfully reconnected to chat server",
+      });
+    });
+
+    socket.on('reconnect_error', (error) => {
+      console.error('Reconnection failed:', error);
+    });
+
+    socket.on('reconnect_failed', () => {
+      toast({
+        title: "Connection Failed", 
+        description: "Unable to reconnect to chat server. Please refresh the page.",
         variant: "destructive",
       });
     });

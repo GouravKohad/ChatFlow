@@ -39,6 +39,15 @@ interface ClientSocket extends SocketData {
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
+  // Health check endpoint for deployment monitoring
+  app.get('/health', (req, res) => {
+    res.status(200).json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  });
+
   // Serve uploaded images
   app.use('/uploads', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -136,9 +145,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Socket.io server
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: "*",
-      methods: ["GET", "POST"]
-    }
+      origin: process.env.NODE_ENV === 'production' 
+        ? [process.env.CLIENT_URL || 'https://your-app.onrender.com'] 
+        : "*",
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    connectTimeout: 45000,
   });
 
   const clients = new Map<string, SocketData>();
