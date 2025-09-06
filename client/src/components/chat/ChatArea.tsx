@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Image, Settings, Users, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import MessageBubble from './MessageBubble';
 import { ChatRoom, ChatUser, ChatMessage, TypingUser } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +32,6 @@ export default function ChatArea({
   const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
@@ -41,13 +39,8 @@ export default function ChatArea({
 
   const scrollToBottom = () => {
     setTimeout(() => {
-      const scrollArea = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollArea) {
-        scrollArea.scrollTop = scrollArea.scrollHeight;
-      } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 100);
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
   };
 
   useEffect(() => {
@@ -219,7 +212,7 @@ export default function ChatArea({
       </div>
 
       {/* Messages Container */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+      <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {/* Welcome Message */}
           <div className="text-center">
@@ -264,7 +257,7 @@ export default function ChatArea({
 
           <div ref={messagesEndRef} />
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Message Input Area */}
       <div className="border-t border-border p-4">
