@@ -24,7 +24,9 @@ export interface IStorage {
   getMessage(id: string): Promise<Message | undefined>;
   getMessagesByRoom(roomId: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
+  updateMessage(id: string, content: string): Promise<Message | undefined>;
   deleteMessage(id: string): Promise<boolean>;
+  deleteRoom(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -162,8 +164,30 @@ export class MemStorage implements IStorage {
     return message;
   }
 
+  async updateMessage(id: string, content: string): Promise<Message | undefined> {
+    const message = this.messages.get(id);
+    if (!message) return undefined;
+    
+    const updatedMessage = { ...message, content };
+    this.messages.set(id, updatedMessage);
+    return updatedMessage;
+  }
+
   async deleteMessage(id: string): Promise<boolean> {
     return this.messages.delete(id);
+  }
+
+  async deleteRoom(id: string): Promise<boolean> {
+    // Remove all messages from the room
+    const roomMessages = Array.from(this.messages.values())
+      .filter(message => message.roomId === id);
+    
+    roomMessages.forEach(message => {
+      this.messages.delete(message.id);
+    });
+    
+    // Remove the room
+    return this.rooms.delete(id);
   }
 }
 

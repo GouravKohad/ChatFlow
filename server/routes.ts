@@ -80,6 +80,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update message
+  app.put('/api/messages/:messageId', async (req, res) => {
+    try {
+      const { messageId } = req.params;
+      const { content } = req.body;
+      
+      if (!content || !content.trim()) {
+        return res.status(400).json({ message: 'Content is required' });
+      }
+
+      const updatedMessage = await storage.updateMessage(messageId, content.trim());
+      if (!updatedMessage) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+
+      res.json(updatedMessage);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to update message' });
+    }
+  });
+
+  // Delete message
+  app.delete('/api/messages/:messageId', async (req, res) => {
+    try {
+      const { messageId } = req.params;
+      const deleted = await storage.deleteMessage(messageId);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete message' });
+    }
+  });
+
+  // Delete room
+  app.delete('/api/rooms/:roomId', async (req, res) => {
+    try {
+      const { roomId } = req.params;
+      const deleted = await storage.deleteRoom(roomId);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: 'Room not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete room' });
+    }
+  });
+
   // Socket.io server
   const io = new SocketIOServer(httpServer, {
     cors: {
@@ -121,6 +174,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
           case 'typing':
             handleTyping(socket, message, socketData);
+            break;
+          case 'edit_message':
+            await handleEditMessage(socket, message, socketData);
+            break;
+          case 'delete_message':
+            await handleDeleteMessage(socket, message, socketData);
+            break;
+          case 'delete_room':
+            await handleDeleteRoom(socket, message, socketData);
             break;
         }
       } catch (error) {
@@ -368,6 +430,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
       username: socketData.username,
       isTyping: message.isTyping
     }, socket.id);
+  }
+
+  async function handleEditMessage(socket: any, message: any, socketData: SocketData) {
+    try {
+      if (!socketData.userId || !socketData.roomId) {
+        socket.emit('message', { type: 'error', message: 'Not authorized' });
+        return;
+      }
+
+      const { messageId, content } = message;
+      
+      if (!content || !content.trim()) {
+        socket.emit('message', { type: 'error', message: 'Content is required' });
+        return;
+      }
+
+      const existingMessage = await storage.getMessage(messageId);
+      if (!existingMessage) {
+        socket.emit('message', { type: 'error', message: 'Message not found' });
+        return;
+      }
+
+      // Only allow editing own messages
+      if (existingMessage.userId !== socketData.userId) {
+        socket.emit('message', { type: 'error', message: 'You can only edit your own messages' });
+        return;
+      }
+
+      const updatedMessage = await storage.updateMessage(messageId, content.trim());
+      if (!updatedMessage) {
+        socket.emit('message', { type: 'error', message: 'Failed to update message' });
+        return;
+      }
+
+      broadcastToRoom(socketData.roomId, {
+        type: 'message_edited',
+        message: updatedMessage
+      });
+
+    } catch (error) {
+      socket.emit('message', { type: 'error', message: 'Failed to edit message' });
+    }
+  }
+
+  async function handleDeleteMessage(socket: any, message: any, socketData: SocketData) {
+    try {
+      if (!socketData.userId || !socketData.roomId) {
+        socket.emit('message', { type: 'error', message: 'Not authorized' });
+        return;
+      }
+
+      const { messageId } = message;
+      
+      const existingMessage = await storage.getMessage(messageId);
+      if (!existingMessage) {
+        socket.emit('message', { type: 'error', message: 'Message not found' });
+        return;
+      }
+
+      const room = await storage.getRoom(socketData.roomId);
+      if (!room) {
+        socket.emit('message', { type: 'error', message: 'Room not found' });
+        return;
+      }
+
+      // Allow deletion if user owns the message or is room admin
+      const isOwner = existingMessage.userId === socketData.userId;
+      const isAdmin = room.createdBy === socketData.userId;
+      
+      if (!isOwner && !isAdmin) {
+        socket.emit('message', { type: 'error', message: 'You can only delete your own messages or be a room admin' });
+        return;
+      }
+
+      const deleted = await storage.deleteMessage(messageId);
+      if (!deleted) {
+        socket.emit('message', { type: 'error', message: 'Failed to delete message' });
+        return;
+      }
+
+      broadcastToRoom(socketData.roomId, {
+        type: 'message_deleted',
+        messageId: messageId
+      });
+
+    } catch (error) {
+      socket.emit('message', { type: 'error', message: 'Failed to delete message' });
+    }
+  }
+
+  async function handleDeleteRoom(socket: any, message: any, socketData: SocketData) {
+    try {
+      if (!socketData.userId) {
+        socket.emit('message', { type: 'error', message: 'Not authorized' });
+        return;
+      }
+
+      const { roomId } = message;
+      
+      const room = await storage.getRoom(roomId);
+      if (!room) {
+        socket.emit('message', { type: 'error', message: 'Room not found' });
+        return;
+      }
+
+      // Only room creator can delete the room
+      if (room.createdBy !== socketData.userId) {
+        socket.emit('message', { type: 'error', message: 'Only room creator can delete the room' });
+        return;
+      }
+
+      const deleted = await storage.deleteRoom(roomId);
+      if (!deleted) {
+        socket.emit('message', { type: 'error', message: 'Failed to delete room' });
+        return;
+      }
+
+      // Broadcast room deletion to all users
+      io.emit('message', {
+        type: 'room_deleted',
+        roomId: roomId
+      });
+
+    } catch (error) {
+      socket.emit('message', { type: 'error', message: 'Failed to delete room' });
+    }
   }
 
   async function getRoomMembers(roomId: string) {
