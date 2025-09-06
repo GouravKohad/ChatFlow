@@ -116,6 +116,39 @@ export function useSocket() {
         }));
         break;
 
+      case 'message_edited':
+        setState(prev => ({
+          ...prev,
+          messages: prev.messages.map(msg => 
+            msg.id === data.message.id 
+              ? { ...data.message, timestamp: new Date(data.message.timestamp) }
+              : msg
+          ),
+        }));
+        break;
+
+      case 'message_deleted':
+        setState(prev => ({
+          ...prev,
+          messages: prev.messages.filter(msg => msg.id !== data.messageId),
+        }));
+        break;
+
+      case 'room_deleted':
+        setState(prev => ({
+          ...prev,
+          rooms: prev.rooms.filter(room => room.id !== data.roomId),
+          currentRoom: prev.currentRoom?.id === data.roomId ? null : prev.currentRoom,
+          messages: prev.currentRoom?.id === data.roomId ? [] : prev.messages,
+          roomMembers: prev.currentRoom?.id === data.roomId ? [] : prev.roomMembers,
+        }));
+        toast({
+          title: "Room Deleted",
+          description: "The room has been deleted",
+          variant: "destructive",
+        });
+        break;
+
       case 'user_joined':
         setState(prev => ({
           ...prev,
@@ -229,6 +262,18 @@ export function useSocket() {
     sendMessage('typing', { isTyping });
   }, [sendMessage]);
 
+  const editMessage = useCallback((messageId: string, content: string) => {
+    sendMessage('edit_message', { messageId, content });
+  }, [sendMessage]);
+
+  const deleteMessage = useCallback((messageId: string) => {
+    sendMessage('delete_message', { messageId });
+  }, [sendMessage]);
+
+  const deleteRoom = useCallback((roomId: string) => {
+    sendMessage('delete_room', { roomId });
+  }, [sendMessage]);
+
   useEffect(() => {
     connect();
     return () => {
@@ -248,5 +293,8 @@ export function useSocket() {
     blockUser,
     unblockUser,
     setTyping,
+    editMessage,
+    deleteMessage,
+    deleteRoom,
   };
 }

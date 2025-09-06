@@ -16,6 +16,8 @@ interface ChatAreaProps {
   onToggleUsers: () => void;
   onAdminControls: () => void;
   onImagePreview: (url: string) => void;
+  onEditMessage: (messageId: string, content: string) => void;
+  onDeleteMessage: (messageId: string) => void;
 }
 
 export default function ChatArea({
@@ -27,7 +29,9 @@ export default function ChatArea({
   onSetTyping,
   onToggleUsers,
   onAdminControls,
-  onImagePreview
+  onImagePreview,
+  onEditMessage,
+  onDeleteMessage
 }: ChatAreaProps) {
   const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -235,6 +239,9 @@ export default function ChatArea({
                 message={message}
                 isOwn={message.userId === currentUser.id}
                 onImageClick={onImagePreview}
+                onEditMessage={onEditMessage}
+                onDeleteMessage={onDeleteMessage}
+                isAdmin={currentRoom?.createdBy === currentUser.id}
               />
             ))}
 

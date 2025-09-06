@@ -140,6 +140,8 @@ export default function Chat() {
           onToggleUsers={() => setUsersListOpen(!usersListOpen)}
           onAdminControls={() => setAdminControlsOpen(true)}
           onImagePreview={setImagePreview}
+          onEditMessage={socket.editMessage}
+          onDeleteMessage={socket.deleteMessage}
         />
       </div>
 
