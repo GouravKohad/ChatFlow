@@ -167,7 +167,7 @@ export default function ChatArea({
   const onlineMembers = currentRoom.members.length;
 
   return (
-    <div className="flex-1 flex flex-col relative">
+    <div className="flex-1 flex flex-col h-full">
       {/* Chat Header */}
       <div className="bg-card border-b border-border p-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-3">
@@ -217,9 +217,9 @@ export default function ChatArea({
         </div>
       </div>
 
-      {/* Messages Container - Independent scrolling area */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto p-4 pb-24" style={{ scrollbarWidth: 'thin' }}>
+      {/* Messages Container - Separate scroll area */}
+      <div className="flex-1 min-h-0">
+        <div className="chat-messages-container p-4">
           <div className="space-y-4">
             {/* Welcome Message */}
             <div className="text-center">
@@ -267,8 +267,8 @@ export default function ChatArea({
         </div>
       </div>
 
-      {/* Message Input Area - Fixed position at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 border-t border-border p-4 bg-background/95 backdrop-blur-sm">
+      {/* Message Input Area - Fixed at bottom */}
+      <div className="chat-input-fixed border-t border-border p-4 bg-background flex-shrink-0">
         <div className="flex items-end space-x-3">
           <Button
             variant="ghost"
