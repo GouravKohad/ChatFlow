@@ -29,7 +29,34 @@ export function useSocket() {
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
 
-    const socket = io();
+    // Get the current hostname and protocol for production deployments
+    const getSocketUrl = () => {
+      if (typeof window !== 'undefined') {
+        const { protocol, hostname, port } = window.location;
+        const isLocalDev = hostname === 'localhost' || hostname === '127.0.0.1';
+        
+        if (isLocalDev) {
+          // In development, connect to the same port
+          return `${protocol}//${hostname}:${port}`;
+        } else {
+          // In production, connect to the same origin
+          return `${protocol}//${hostname}`;
+        }
+      }
+      return undefined;
+    };
+
+    const socketUrl = getSocketUrl();
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'], // Enable both transports for better compatibility
+      upgrade: true,
+      rememberUpgrade: true,
+      timeout: 20000,
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
     socketRef.current = socket;
 
     socket.on('connect', () => {
