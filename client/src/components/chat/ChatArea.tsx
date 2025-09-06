@@ -167,9 +167,9 @@ export default function ChatArea({
   const onlineMembers = currentRoom.members.length;
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col relative">
       {/* Chat Header */}
-      <div className="bg-card border-b border-border p-4 flex items-center justify-between">
+      <div className="bg-card border-b border-border p-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-3">
           <div className="w-4 h-4 bg-green-500 rounded-full"></div>
           <div>
@@ -217,9 +217,9 @@ export default function ChatArea({
         </div>
       </div>
 
-      {/* Messages Container - Separate scrolling area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto p-4 pb-2">
+      {/* Messages Container - Independent scrolling area */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto p-4 pb-24" style={{ scrollbarWidth: 'thin' }}>
           <div className="space-y-4">
             {/* Welcome Message */}
             <div className="text-center">
@@ -265,55 +265,54 @@ export default function ChatArea({
             <div ref={messagesEndRef} />
           </div>
         </div>
-
-        {/* Message Input Area - Fixed at bottom */}
-        <div className="border-t border-border p-4 bg-background">
-          <div className="flex items-end space-x-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              title="Share Image"
-              data-testid="button-upload-image"
-            >
-              <Image className="h-4 w-4" />
-            </Button>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            
-            <div className="flex-1 relative">
-              <Textarea
-                ref={textareaRef}
-                placeholder="Type your message..."
-                value={messageText}
-                onChange={(e) => {
-                  setMessageText(e.target.value);
-                  autoResize(e.target);
-                  handleTyping(e.target.value.length > 0);
-                }}
-                onKeyDown={handleKeyPress}
-                className="resize-none max-h-32 min-h-[2.5rem]"
-                data-testid="input-message"
-              />
-            </div>
-            
-            <Button
-              onClick={handleSendMessage}
-              disabled={!messageText.trim()}
-              data-testid="button-send-message"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
       </div>
 
+      {/* Message Input Area - Fixed position at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 border-t border-border p-4 bg-background/95 backdrop-blur-sm">
+        <div className="flex items-end space-x-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            title="Share Image"
+            data-testid="button-upload-image"
+          >
+            <Image className="h-4 w-4" />
+          </Button>
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          
+          <div className="flex-1 relative">
+            <Textarea
+              ref={textareaRef}
+              placeholder="Type your message..."
+              value={messageText}
+              onChange={(e) => {
+                setMessageText(e.target.value);
+                autoResize(e.target);
+                handleTyping(e.target.value.length > 0);
+              }}
+              onKeyDown={handleKeyPress}
+              className="resize-none max-h-32 min-h-[2.5rem] bg-background"
+              data-testid="input-message"
+            />
+          </div>
+          
+          <Button
+            onClick={handleSendMessage}
+            disabled={!messageText.trim()}
+            data-testid="button-send-message"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
