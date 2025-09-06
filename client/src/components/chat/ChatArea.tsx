@@ -38,9 +38,15 @@ export default function ChatArea({
   const { toast } = useToast();
 
   const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 50);
+    requestAnimationFrame(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end',
+          inline: 'nearest'
+        });
+      }
+    });
   };
 
   useEffect(() => {
@@ -75,7 +81,7 @@ export default function ChatArea({
     }
     
     // Scroll to bottom after sending message
-    setTimeout(scrollToBottom, 50);
+    scrollToBottom();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -101,7 +107,7 @@ export default function ChatArea({
 
       const { imageUrl } = await response.json();
       onSendMessage('', 'image', imageUrl);
-      setTimeout(scrollToBottom, 50);
+      scrollToBottom();
     } catch (error) {
       toast({
         title: "Upload Failed",
@@ -212,7 +218,7 @@ export default function ChatArea({
       </div>
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
         <div className="space-y-4">
           {/* Welcome Message */}
           <div className="text-center">

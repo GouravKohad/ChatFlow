@@ -25,7 +25,7 @@ export default function UsersList({
     `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
 
   return (
-    <div className="p-4 h-full flex flex-col">
+    <div className="p-4 h-full flex flex-col min-h-0">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold flex items-center space-x-2">
           <span>Members ({members.length})</span>

@@ -104,9 +104,24 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
     font-family: var(--font-sans);
+    overscroll-behavior: none;
+  }
+  
+  /* Fix for iOS Safari viewport height issues */
+  .h-dvh {
+    height: 100dvh;
+  }
+  
+  /* Ensure proper scrolling on mobile */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
   }
 }
 

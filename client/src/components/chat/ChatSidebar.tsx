@@ -75,7 +75,7 @@ export default function ChatSidebar({
       </div>
 
       {/* Rooms List */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden min-h-0">
         <ScrollArea className="h-full">
           <div className="p-4">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
