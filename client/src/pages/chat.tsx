@@ -182,6 +182,7 @@ export default function Chat() {
           members={socket.roomMembers}
           onBlockUser={socket.blockUser}
           onUnblockUser={socket.unblockUser}
+          onDeleteRoom={socket.deleteRoom}
         />
       )}
 

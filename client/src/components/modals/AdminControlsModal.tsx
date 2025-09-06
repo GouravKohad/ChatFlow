@@ -18,6 +18,7 @@ interface AdminControlsModalProps {
   members: ChatUser[];
   onBlockUser: (userId: string) => void;
   onUnblockUser: (userId: string) => void;
+  onDeleteRoom: (roomId: string) => void;
 }
 
 export default function AdminControlsModal({
@@ -27,7 +28,8 @@ export default function AdminControlsModal({
   currentUser,
   members,
   onBlockUser,
-  onUnblockUser
+  onUnblockUser,
+  onDeleteRoom
 }: AdminControlsModalProps) {
   const getRandomAvatar = (seed: string) => 
     `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
@@ -171,6 +173,12 @@ export default function AdminControlsModal({
             <Button
               variant="destructive"
               className="w-full"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to delete "${currentRoom.name}"? This action cannot be undone.`)) {
+                  onDeleteRoom(currentRoom.id);
+                  onOpenChange(false);
+                }
+              }}
               data-testid="button-delete-room"
             >
               <Trash2 className="h-4 w-4 mr-2" />
