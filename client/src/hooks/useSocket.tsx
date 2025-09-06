@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { ChatUser, ChatRoom, ChatMessage, TypingUser } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 
@@ -13,7 +14,7 @@ interface SocketState {
 }
 
 export function useSocket() {
-  const socketRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const { toast } = useToast();
   const [state, setState] = useState<SocketState>({
     isConnected: false,
@@ -26,41 +27,31 @@ export function useSocket() {
   });
 
   const connect = useCallback(() => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) return;
+    if (socketRef.current?.connected) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    
-    const socket = new WebSocket(wsUrl);
+    const socket = io();
     socketRef.current = socket;
 
-    socket.onopen = () => {
+    socket.on('connect', () => {
       setState(prev => ({ ...prev, isConnected: true }));
-    };
+    });
 
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        handleSocketMessage(data);
-      } catch (error) {
-        console.error('Failed to parse socket message:', error);
-      }
-    };
+    socket.on('message', (data) => {
+      handleSocketMessage(data);
+    });
 
-    socket.onclose = () => {
+    socket.on('disconnect', () => {
       setState(prev => ({ ...prev, isConnected: false }));
-      // Attempt to reconnect after 3 seconds
-      setTimeout(connect, 3000);
-    };
+    });
 
-    socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    socket.on('connect_error', (error) => {
+      console.error('Socket.io connection error:', error);
       toast({
         title: "Connection Error",
         description: "Failed to connect to chat server",
         variant: "destructive",
       });
-    };
+    });
   }, [toast]);
 
   const handleSocketMessage = (data: any) => {
@@ -201,8 +192,8 @@ export function useSocket() {
   };
 
   const sendMessage = useCallback((type: string, payload: any = {}) => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type, ...payload }));
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('message', { type, ...payload });
     }
   }, []);
 
@@ -242,7 +233,7 @@ export function useSocket() {
     connect();
     return () => {
       if (socketRef.current) {
-        socketRef.current.close();
+        socketRef.current.disconnect();
       }
     };
   }, [connect]);
