@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+import { Server as SocketIOServer } from "socket.io";
 import { storage } from "./storage";
 import { insertRoomSchema, insertUserSchema, insertMessageSchema } from "@shared/schema";
 import multer from "multer";
@@ -30,6 +30,10 @@ interface SocketData {
   userId?: string;
   username?: string;
   roomId?: string;
+}
+
+interface ClientSocket extends SocketData {
+  id: string;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -76,61 +80,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // WebSocket server
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  // Socket.io server
+  const io = new SocketIOServer(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
 
-  const clients = new Map<WebSocket, SocketData>();
+  const clients = new Map<string, SocketData>();
 
-  wss.on('connection', (ws: WebSocket) => {
-    clients.set(ws, {});
+  io.on('connection', (socket) => {
+    clients.set(socket.id, {});
 
-    ws.on('message', async (data: Buffer) => {
+    socket.on('message', async (message) => {
       try {
-        const message = JSON.parse(data.toString());
-        const socketData = clients.get(ws) || {};
+        const socketData = clients.get(socket.id) || {};
 
         switch (message.type) {
           case 'join':
-            await handleJoin(ws, message, socketData);
+            await handleJoin(socket, message, socketData);
             break;
           case 'create_room':
-            await handleCreateRoom(ws, message, socketData);
+            await handleCreateRoom(socket, message, socketData);
             break;
           case 'join_room':
-            await handleJoinRoom(ws, message, socketData);
+            await handleJoinRoom(socket, message, socketData);
             break;
           case 'leave_room':
-            await handleLeaveRoom(ws, message, socketData);
+            await handleLeaveRoom(socket, message, socketData);
             break;
           case 'send_message':
-            await handleSendMessage(ws, message, socketData);
+            await handleSendMessage(socket, message, socketData);
             break;
           case 'block_user':
-            await handleBlockUser(ws, message, socketData);
+            await handleBlockUser(socket, message, socketData);
             break;
           case 'unblock_user':
-            await handleUnblockUser(ws, message, socketData);
+            await handleUnblockUser(socket, message, socketData);
             break;
           case 'typing':
-            handleTyping(ws, message, socketData);
+            handleTyping(socket, message, socketData);
             break;
         }
       } catch (error) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+        socket.emit('message', { type: 'error', message: 'Invalid message format' });
       }
     });
 
-    ws.on('close', () => {
-      const socketData = clients.get(ws);
+    socket.on('disconnect', () => {
+      const socketData = clients.get(socket.id);
       if (socketData?.userId) {
         storage.updateUser(socketData.userId, { isOnline: false });
         broadcastUserLeft(socketData);
       }
-      clients.delete(ws);
+      clients.delete(socket.id);
     });
   });
 
-  async function handleJoin(ws: WebSocket, message: any, socketData: SocketData) {
+  async function handleJoin(socket: any, message: any, socketData: SocketData) {
     try {
       const { username, avatar } = message;
       
@@ -143,23 +151,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       socketData.userId = user.id;
       socketData.username = user.username;
-      clients.set(ws, socketData);
+      clients.set(socket.id, socketData);
 
-      ws.send(JSON.stringify({
+      socket.emit('message', {
         type: 'joined',
         user: user,
         rooms: await storage.getAllRooms()
-      }));
+      });
 
     } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to join' }));
+      socket.emit('message', { type: 'error', message: 'Failed to join' });
     }
   }
 
-  async function handleCreateRoom(ws: WebSocket, message: any, socketData: SocketData) {
+  async function handleCreateRoom(socket: any, message: any, socketData: SocketData) {
     try {
       if (!socketData.userId) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
+        socket.emit('message', { type: 'error', message: 'Not authenticated' });
         return;
       }
 
@@ -172,40 +180,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existingRoom = await storage.getRoomByName(roomData.name);
       if (existingRoom) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Room name already exists' }));
+        socket.emit('message', { type: 'error', message: 'Room name already exists' });
         return;
       }
 
       const room = await storage.createRoom(roomData);
       
-      ws.send(JSON.stringify({
+      socket.emit('message', {
         type: 'room_created',
         room: room
-      }));
+      });
 
       broadcastToAll({ type: 'room_list_updated', rooms: await storage.getAllRooms() });
 
     } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to create room' }));
+      socket.emit('message', { type: 'error', message: 'Failed to create room' });
     }
   }
 
-  async function handleJoinRoom(ws: WebSocket, message: any, socketData: SocketData) {
+  async function handleJoinRoom(socket: any, message: any, socketData: SocketData) {
     try {
       if (!socketData.userId) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
+        socket.emit('message', { type: 'error', message: 'Not authenticated' });
         return;
       }
 
       const { roomId } = message;
       const room = await storage.getRoom(roomId);
       if (!room) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
+        socket.emit('message', { type: 'error', message: 'Room not found' });
         return;
       }
 
       if (room.blockedUsers.includes(socketData.userId)) {
-        ws.send(JSON.stringify({ type: 'error', message: 'You are blocked from this room' }));
+        socket.emit('message', { type: 'error', message: 'You are blocked from this room' });
         return;
       }
 
@@ -223,30 +231,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.addUserToRoom(roomId, socketData.userId);
       await storage.updateUser(socketData.userId, { currentRoom: roomId });
       socketData.roomId = roomId;
-      clients.set(ws, socketData);
+      clients.set(socket.id, socketData);
 
       const messages = await storage.getMessagesByRoom(roomId);
       const roomMembers = await getRoomMembers(roomId);
 
-      ws.send(JSON.stringify({
+      socket.emit('message', {
         type: 'room_joined',
         room: room,
         messages: messages,
         members: roomMembers
-      }));
+      });
 
       broadcastToRoom(roomId, {
         type: 'user_joined',
         userId: socketData.userId,
         username: socketData.username
-      }, ws);
+      }, socket.id);
 
     } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to join room' }));
+      socket.emit('message', { type: 'error', message: 'Failed to join room' });
     }
   }
 
-  async function handleLeaveRoom(ws: WebSocket, message: any, socketData: SocketData) {
+  async function handleLeaveRoom(socket: any, message: any, socketData: SocketData) {
     if (!socketData.userId || !socketData.roomId) return;
 
     await storage.removeUserFromRoom(socketData.roomId, socketData.userId);
@@ -259,26 +267,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     socketData.roomId = undefined;
-    clients.set(ws, socketData);
+    clients.set(socket.id, socketData);
 
-    ws.send(JSON.stringify({ type: 'room_left' }));
+    socket.emit('message', { type: 'room_left' });
   }
 
-  async function handleSendMessage(ws: WebSocket, message: any, socketData: SocketData) {
+  async function handleSendMessage(socket: any, message: any, socketData: SocketData) {
     try {
       if (!socketData.userId || !socketData.roomId) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Not in a room' }));
+        socket.emit('message', { type: 'error', message: 'Not in a room' });
         return;
       }
 
       const room = await storage.getRoom(socketData.roomId);
       if (!room) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
+        socket.emit('message', { type: 'error', message: 'Room not found' });
         return;
       }
 
       if (room.blockedUsers.includes(socketData.userId)) {
-        ws.send(JSON.stringify({ type: 'error', message: 'You are blocked from sending messages' }));
+        socket.emit('message', { type: 'error', message: 'You are blocked from sending messages' });
         return;
       }
 
@@ -303,17 +311,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to send message' }));
+      socket.emit('message', { type: 'error', message: 'Failed to send message' });
     }
   }
 
-  async function handleBlockUser(ws: WebSocket, message: any, socketData: SocketData) {
+  async function handleBlockUser(socket: any, message: any, socketData: SocketData) {
     try {
       if (!socketData.userId || !socketData.roomId) return;
 
       const room = await storage.getRoom(socketData.roomId);
       if (!room || room.createdBy !== socketData.userId) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Not authorized' }));
+        socket.emit('message', { type: 'error', message: 'Not authorized' });
         return;
       }
 
@@ -325,17 +333,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to block user' }));
+      socket.emit('message', { type: 'error', message: 'Failed to block user' });
     }
   }
 
-  async function handleUnblockUser(ws: WebSocket, message: any, socketData: SocketData) {
+  async function handleUnblockUser(socket: any, message: any, socketData: SocketData) {
     try {
       if (!socketData.userId || !socketData.roomId) return;
 
       const room = await storage.getRoom(socketData.roomId);
       if (!room || room.createdBy !== socketData.userId) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Not authorized' }));
+        socket.emit('message', { type: 'error', message: 'Not authorized' });
         return;
       }
 
@@ -347,11 +355,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to unblock user' }));
+      socket.emit('message', { type: 'error', message: 'Failed to unblock user' });
     }
   }
 
-  function handleTyping(ws: WebSocket, message: any, socketData: SocketData) {
+  function handleTyping(socket: any, message: any, socketData: SocketData) {
     if (!socketData.roomId) return;
 
     broadcastToRoom(socketData.roomId, {
@@ -359,7 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       userId: socketData.userId,
       username: socketData.username,
       isTyping: message.isTyping
-    }, ws);
+    }, socket.id);
   }
 
   async function getRoomMembers(roomId: string) {
@@ -370,18 +378,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return allUsers.filter(user => room.members.includes(user.id));
   }
 
-  function broadcastToRoom(roomId: string, message: any, excludeWs?: WebSocket) {
-    clients.forEach((socketData, ws) => {
-      if (socketData.roomId === roomId && ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(message));
+  function broadcastToRoom(roomId: string, message: any, excludeSocketId?: string) {
+    clients.forEach((socketData, socketId) => {
+      if (socketData.roomId === roomId && socketId !== excludeSocketId) {
+        const socket = io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.emit('message', message);
+        }
       }
     });
   }
 
-  function broadcastToAll(message: any, excludeWs?: WebSocket) {
-    clients.forEach((socketData, ws) => {
-      if (ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(message));
+  function broadcastToAll(message: any, excludeSocketId?: string) {
+    clients.forEach((socketData, socketId) => {
+      if (socketId !== excludeSocketId) {
+        const socket = io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.emit('message', message);
+        }
       }
     });
   }
