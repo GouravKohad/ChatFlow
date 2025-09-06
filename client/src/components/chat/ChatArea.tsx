@@ -217,100 +217,103 @@ export default function ChatArea({
         </div>
       </div>
 
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 min-h-0">
-        <div className="space-y-4">
-          {/* Welcome Message */}
-          <div className="text-center">
-            <div className="inline-block bg-muted text-muted-foreground px-3 py-1 rounded-full text-sm">
-              Welcome to {currentRoom.name}! 🎉
-            </div>
-          </div>
-
-          {/* Messages */}
-          {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isOwn={message.userId === currentUser.id}
-              onImageClick={onImagePreview}
-            />
-          ))}
-
-          {/* Typing Indicators */}
-          {typingUsers.map((user) => (
-            <div key={user.userId} className="flex items-start space-x-3">
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                <span className="text-xs font-medium">
-                  {user.username.charAt(0).toUpperCase()}
-                </span>
+      {/* Messages Container - Separate scrolling area */}
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto p-4 pb-2">
+          <div className="space-y-4">
+            {/* Welcome Message */}
+            <div className="text-center">
+              <div className="inline-block bg-muted text-muted-foreground px-3 py-1 rounded-full text-sm">
+                Welcome to {currentRoom.name}! 🎉
               </div>
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="font-medium text-sm">{user.username}</span>
-                  <span className="text-xs text-muted-foreground">typing...</span>
+            </div>
+
+            {/* Messages */}
+            {messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isOwn={message.userId === currentUser.id}
+                onImageClick={onImagePreview}
+              />
+            ))}
+
+            {/* Typing Indicators */}
+            {typingUsers.map((user) => (
+              <div key={user.userId} className="flex items-start space-x-3">
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                  <span className="text-xs font-medium">
+                    {user.username.charAt(0).toUpperCase()}
+                  </span>
                 </div>
-                <div className="chat-bubble-received px-4 py-2 w-16">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full typing-indicator"></div>
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full typing-indicator" style={{animationDelay: '0.2s'}}></div>
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full typing-indicator" style={{animationDelay: '0.4s'}}></div>
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="font-medium text-sm">{user.username}</span>
+                    <span className="text-xs text-muted-foreground">typing...</span>
+                  </div>
+                  <div className="chat-bubble-received px-4 py-2 w-16">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-muted-foreground rounded-full typing-indicator"></div>
+                      <div className="w-2 h-2 bg-muted-foreground rounded-full typing-indicator" style={{animationDelay: '0.2s'}}></div>
+                      <div className="w-2 h-2 bg-muted-foreground rounded-full typing-indicator" style={{animationDelay: '0.4s'}}></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
 
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* Message Input Area */}
-      <div className="border-t border-border p-4">
-        <div className="flex items-end space-x-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            title="Share Image"
-            data-testid="button-upload-image"
-          >
-            <Image className="h-4 w-4" />
-          </Button>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          
-          <div className="flex-1 relative">
-            <Textarea
-              ref={textareaRef}
-              placeholder="Type your message..."
-              value={messageText}
-              onChange={(e) => {
-                setMessageText(e.target.value);
-                autoResize(e.target);
-                handleTyping(e.target.value.length > 0);
-              }}
-              onKeyDown={handleKeyPress}
-              className="resize-none max-h-32 min-h-[2.5rem]"
-              data-testid="input-message"
-            />
+            <div ref={messagesEndRef} />
           </div>
-          
-          <Button
-            onClick={handleSendMessage}
-            disabled={!messageText.trim()}
-            data-testid="button-send-message"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+        </div>
+
+        {/* Message Input Area - Fixed at bottom */}
+        <div className="border-t border-border p-4 bg-background">
+          <div className="flex items-end space-x-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              title="Share Image"
+              data-testid="button-upload-image"
+            >
+              <Image className="h-4 w-4" />
+            </Button>
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            
+            <div className="flex-1 relative">
+              <Textarea
+                ref={textareaRef}
+                placeholder="Type your message..."
+                value={messageText}
+                onChange={(e) => {
+                  setMessageText(e.target.value);
+                  autoResize(e.target);
+                  handleTyping(e.target.value.length > 0);
+                }}
+                onKeyDown={handleKeyPress}
+                className="resize-none max-h-32 min-h-[2.5rem]"
+                data-testid="input-message"
+              />
+            </div>
+            
+            <Button
+              onClick={handleSendMessage}
+              disabled={!messageText.trim()}
+              data-testid="button-send-message"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
+
     </div>
   );
 }
