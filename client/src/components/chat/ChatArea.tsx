@@ -33,18 +33,26 @@ export default function ChatArea({
   const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      const scrollArea = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollArea) {
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, typingUsers]);
 
   const handleTyping = (typing: boolean) => {
     if (typing !== isTyping) {
@@ -72,6 +80,9 @@ export default function ChatArea({
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
+    
+    // Scroll to bottom after sending message
+    setTimeout(scrollToBottom, 50);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -97,6 +108,7 @@ export default function ChatArea({
 
       const { imageUrl } = await response.json();
       onSendMessage('', 'image', imageUrl);
+      setTimeout(scrollToBottom, 50);
     } catch (error) {
       toast({
         title: "Upload Failed",
@@ -207,7 +219,7 @@ export default function ChatArea({
       </div>
 
       {/* Messages Container */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
         <div className="space-y-4">
           {/* Welcome Message */}
           <div className="text-center">
