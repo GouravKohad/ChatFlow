@@ -1,0 +1,818 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatFlow - Real-time Chat Rooms</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                }
+            },
+        }
+    };
+    </script>
+    <style>
+        :root {
+            --background: hsl(210 40% 98%);
+            --foreground: hsl(222.2 84% 4.9%);
+            --card: hsl(0 0% 100%);
+            --card-foreground: hsl(222.2 84% 4.9%);
+            --primary: hsl(221.2 83.2% 53.3%);
+            --primary-foreground: hsl(210 40% 98%);
+            --secondary: hsl(262.1 83.3% 57.8%);
+            --secondary-foreground: hsl(210 40% 98%);
+            --muted: hsl(210 40% 96%);
+            --muted-foreground: hsl(215.4 16.3% 46.9%);
+            --accent: hsl(262.1 83.3% 57.8%);
+            --accent-foreground: hsl(210 40% 98%);
+            --border: hsl(214.3 31.8% 91.4%);
+            --input: hsl(214.3 31.8% 91.4%);
+            --ring: hsl(221.2 83.2% 53.3%);
+            --radius: 0.75rem;
+        }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .chat-bubble-sent {
+            background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
+            color: hsl(var(--primary-foreground));
+            border-radius: 18px 18px 4px 18px;
+        }
+        
+        .chat-bubble-received {
+            background: hsl(var(--card));
+            color: hsl(var(--card-foreground));
+            border: 1px solid hsl(var(--border));
+            border-radius: 18px 18px 18px 4px;
+        }
+        
+        .online-indicator {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .typing-indicator {
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        .message-fade-in {
+            animation: fadeInUp 0.3s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .sidebar-slide {
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        .sidebar-slide.hidden {
+            transform: translateX(-100%);
+        }
+    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-background text-foreground min-h-screen">
+    <!-- @COMPONENT: ChatApp [main application container] -->
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Mobile Menu Button -->
+        <button id="mobileMenuBtn" class="fixed top-4 left-4 z-50 lg:hidden bg-primary text-primary-foreground p-2 rounded-lg shadow-lg">
+            <i class="fas fa-bars"></i>
+        </button>
+        
+        <!-- @COMPONENT: Sidebar [rooms and users list] -->
+        <div id="sidebar" class="sidebar-slide w-80 bg-card border-r border-border flex flex-col fixed lg:relative h-full z-40 lg:translate-x-0 -translate-x-full">
+            
+            <!-- Header -->
+            <div class="p-4 border-b border-border bg-gradient-to-r from-primary to-secondary">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-xl font-bold text-primary-foreground">ChatFlow</h1>
+                    <button id="closeSidebarBtn" class="lg:hidden text-primary-foreground">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- User Profile Section -->
+            <div class="p-4 border-b border-border">
+                <div class="flex items-center space-x-3">
+                    <div class="relative">
+                        <!-- Random avatar placeholder for current user -->
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=64&h=64" 
+                             alt="User avatar" class="w-10 h-10 rounded-full object-cover">
+                        <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-card online-indicator"></div>
+                    </div>
+                    <div>
+                        <p class="font-medium" data-bind="currentUser.name">John Doe</p>
+                        <p class="text-sm text-muted-foreground">Online</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Room Creation -->
+            <div class="p-4 border-b border-border">
+                <button id="createRoomBtn" class="w-full bg-primary text-primary-foreground py-2 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center justify-center space-x-2">
+                    <i class="fas fa-plus"></i>
+                    <span>Create Room</span>
+                </button>
+            </div>
+            
+            <!-- Rooms List -->
+            <div class="flex-1 overflow-y-auto">
+                <div class="p-4">
+                    <h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Active Rooms</h3>
+                    
+                    <!-- @MAP: rooms.map(room => ( -->
+                    <div class="space-y-2">
+                        <div class="p-3 rounded-lg bg-primary/10 border border-primary/20 cursor-pointer hover:bg-primary/20 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                    <div>
+                                        <p class="font-medium" data-bind="room.name">General Chat</p>
+                                        <p class="text-xs text-muted-foreground">5 members</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-crown text-yellow-500" title="You are admin"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                <div>
+                                    <p class="font-medium" data-bind="room.name">Tech Discussion</p>
+                                    <p class="text-xs text-muted-foreground">12 members</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
+                                <div>
+                                    <p class="font-medium text-muted-foreground" data-bind="room.name">Random</p>
+                                    <p class="text-xs text-muted-foreground">3 members</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+            </div>
+            
+            <!-- Join Room Button -->
+            <div class="p-4 border-t border-border">
+                <button id="joinRoomBtn" class="w-full border border-border text-foreground py-2 px-4 rounded-lg font-medium hover:bg-muted transition-colors flex items-center justify-center space-x-2">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Join Room</span>
+                </button>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: Sidebar -->
+        
+        <!-- @COMPONENT: MainChatArea [chat messages and input] -->
+        <div class="flex-1 flex flex-col">
+            
+            <!-- Chat Header -->
+            <div class="bg-card border-b border-border p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+                    <div>
+                        <h2 class="font-semibold text-lg" data-bind="currentRoom.name">General Chat</h2>
+                        <p class="text-sm text-muted-foreground">5 members online</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <!-- Admin Controls Button -->
+                    <button id="adminControlsBtn" class="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="Admin Controls">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    
+                    <!-- Users List Toggle -->
+                    <button id="usersToggleBtn" class="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors lg:hidden" title="Show Users">
+                        <i class="fas fa-users"></i>
+                    </button>
+                    
+                    <!-- Room Info -->
+                    <button class="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="Room Info">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex-1 flex">
+                <!-- Chat Messages Area -->
+                <div class="flex-1 flex flex-col">
+                    
+                    <!-- Messages Container -->
+                    <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
+                        
+                        <!-- System Message -->
+                        <div class="text-center">
+                            <div class="inline-block bg-muted text-muted-foreground px-3 py-1 rounded-full text-sm">
+                                Welcome to General Chat! 🎉
+                            </div>
+                        </div>
+                        
+                        <!-- @MAP: messages.map(message => ( -->
+                        <!-- Received Message -->
+                        <div class="flex items-start space-x-3 message-fade-in">
+                            <!-- User avatar from Unsplash - professional headshot -->
+                            <img src="https://images.unsplash.com/photo-1494790108755-2616b612c5e8?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=40&h=40" 
+                                 alt="User avatar" class="w-8 h-8 rounded-full object-cover">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <span class="font-medium text-sm" data-bind="message.user.name">Alice</span>
+                                    <span class="text-xs text-muted-foreground" data-bind="message.timestamp">2:34 PM</span>
+                                </div>
+                                <div class="chat-bubble-received px-4 py-2 max-w-md">
+                                    <p data-bind="message.content">Hey everyone! How's it going? 👋</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Sent Message -->
+                        <div class="flex items-start justify-end space-x-3 message-fade-in">
+                            <div class="flex-1 flex flex-col items-end">
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <span class="text-xs text-muted-foreground" data-bind="message.timestamp">2:35 PM</span>
+                                    <span class="font-medium text-sm" data-bind="currentUser.name">You</span>
+                                </div>
+                                <div class="chat-bubble-sent px-4 py-2 max-w-md">
+                                    <p data-bind="message.content">Hi Alice! Everything's great, thanks for asking! 😊</p>
+                                </div>
+                            </div>
+                            <!-- Current user avatar -->
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=40&h=40" 
+                                 alt="Your avatar" class="w-8 h-8 rounded-full object-cover">
+                        </div>
+                        
+                        <!-- Image Message -->
+                        <div class="flex items-start space-x-3 message-fade-in">
+                            <!-- Different user avatar -->
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=40&h=40" 
+                                 alt="User avatar" class="w-8 h-8 rounded-full object-cover">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <span class="font-medium text-sm" data-bind="message.user.name">Bob</span>
+                                    <span class="text-xs text-muted-foreground" data-bind="message.timestamp">2:36 PM</span>
+                                </div>
+                                <div class="chat-bubble-received px-4 py-2 max-w-md">
+                                    <p class="mb-2" data-bind="message.content">Check out this amazing sunset! 🌅</p>
+                                    <!-- Beautiful sunset landscape image -->
+                                    <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=300&h=200" 
+                                         alt="Shared image" class="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity" 
+                                         data-implementation="Should open image in full-screen modal">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Typing Indicator -->
+                        <div class="flex items-start space-x-3">
+                            <!-- Another user avatar -->
+                            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=40&h=40" 
+                                 alt="User avatar" class="w-8 h-8 rounded-full object-cover">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <span class="font-medium text-sm" data-bind="message.user.name">Sarah</span>
+                                    <span class="text-xs text-muted-foreground">typing...</span>
+                                </div>
+                                <div class="chat-bubble-received px-4 py-2 w-16">
+                                    <div class="flex space-x-1">
+                                        <div class="w-2 h-2 bg-muted-foreground rounded-full typing-indicator"></div>
+                                        <div class="w-2 h-2 bg-muted-foreground rounded-full typing-indicator" style="animation-delay: 0.2s;"></div>
+                                        <div class="w-2 h-2 bg-muted-foreground rounded-full typing-indicator" style="animation-delay: 0.4s;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- @END_MAP )) -->
+                        
+                    </div>
+                    
+                    <!-- Message Input Area -->
+                    <div class="border-t border-border p-4">
+                        <div class="flex items-end space-x-3">
+                            <!-- Image Upload Button -->
+                            <button class="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="Share Image">
+                                <i class="fas fa-image"></i>
+                                <input type="file" accept="image/*" class="hidden" data-implementation="Handle image upload and preview">
+                            </button>
+                            
+                            <!-- Message Input -->
+                            <div class="flex-1 relative">
+                                <textarea 
+                                    id="messageInput" 
+                                    placeholder="Type your message..."
+                                    class="w-full px-4 py-3 bg-input border border-border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent max-h-32"
+                                    rows="1"
+                                    data-implementation="Auto-resize and handle enter key"></textarea>
+                            </div>
+                            
+                            <!-- Send Button -->
+                            <button id="sendMessageBtn" class="bg-primary text-primary-foreground p-3 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Users List Sidebar -->
+                <div id="usersList" class="w-64 border-l border-border bg-card p-4 hidden lg:block">
+                    <h3 class="font-semibold mb-4 flex items-center space-x-2">
+                        <i class="fas fa-users text-muted-foreground"></i>
+                        <span>Members (5)</span>
+                    </h3>
+                    
+                    <!-- @MAP: roomUsers.map(user => ( -->
+                    <div class="space-y-3">
+                        <!-- Admin User (Room Creator) -->
+                        <div class="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors">
+                            <div class="flex items-center space-x-3">
+                                <div class="relative">
+                                    <!-- Current user as admin -->
+                                    <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=32&h=32" 
+                                         alt="User avatar" class="w-8 h-8 rounded-full object-cover">
+                                    <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-card"></div>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm" data-bind="user.name">John Doe (You)</p>
+                                    <p class="text-xs text-muted-foreground">Admin</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-crown text-yellow-500 text-sm"></i>
+                        </div>
+                        
+                        <!-- Regular Users -->
+                        <div class="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors group">
+                            <div class="flex items-center space-x-3">
+                                <div class="relative">
+                                    <img src="https://pixabay.com/get/gabbbee3ae3286c6184e9cb7bc2468579b51a2de89724c2c1707fc64307497e0061fdfe80c6b8b5b6aa5c1cff74d6c84590401d56221822e26ae70af72d4b7a11_1280.jpg" 
+                                         alt="User avatar" class="w-8 h-8 rounded-full object-cover">
+                                    <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-card"></div>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm" data-bind="user.name">Alice</p>
+                                    <p class="text-xs text-green-600">Online</p>
+                                </div>
+                            </div>
+                            <button class="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-1 rounded transition-all" 
+                                    title="Block User" data-event="click:blockUser">
+                                <i class="fas fa-ban text-xs"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors group">
+                            <div class="flex items-center space-x-3">
+                                <div class="relative">
+                                    <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=32&h=32" 
+                                         alt="User avatar" class="w-8 h-8 rounded-full object-cover">
+                                    <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-card"></div>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm" data-bind="user.name">Bob</p>
+                                    <p class="text-xs text-green-600">Online</p>
+                                </div>
+                            </div>
+                            <button class="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-1 rounded transition-all" 
+                                    title="Block User" data-event="click:blockUser">
+                                <i class="fas fa-ban text-xs"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors group">
+                            <div class="flex items-center space-x-3">
+                                <div class="relative">
+                                    <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=32&h=32" 
+                                         alt="User avatar" class="w-8 h-8 rounded-full object-cover">
+                                    <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-gray-400 rounded-full border border-card"></div>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm" data-bind="user.name">Sarah</p>
+                                    <p class="text-xs text-muted-foreground">Away</p>
+                                </div>
+                            </div>
+                            <button class="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-1 rounded transition-all" 
+                                    title="Block User" data-event="click:blockUser">
+                                <i class="fas fa-ban text-xs"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Blocked User Example -->
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-red-50 border border-red-200">
+                            <div class="flex items-center space-x-3">
+                                <div class="relative">
+                                    <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=32&h=32" 
+                                         alt="User avatar" class="w-8 h-8 rounded-full object-cover grayscale">
+                                    <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-card"></div>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm text-red-600" data-bind="user.name">Mike</p>
+                                    <p class="text-xs text-red-500">Blocked</p>
+                                </div>
+                            </div>
+                            <button class="text-green-600 hover:bg-green-100 p-1 rounded transition-all" 
+                                    title="Unblock User" data-event="click:unblockUser">
+                                <i class="fas fa-check text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: MainChatArea -->
+    </div>
+    
+    <!-- Mobile Overlay -->
+    <div id="mobileOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden hidden"></div>
+    
+    <!-- @COMPONENT: CreateRoomModal [room creation interface] -->
+    <div id="createRoomModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-card rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold">Create New Room</h3>
+                <button id="closeCreateModal" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="createRoomForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Room Name</label>
+                    <input 
+                        type="text" 
+                        id="roomNameInput"
+                        placeholder="Enter room name..."
+                        class="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                        required>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Room Description (Optional)</label>
+                    <textarea 
+                        id="roomDescInput"
+                        placeholder="What's this room about?"
+                        class="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-none"
+                        rows="3"></textarea>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="privateRoom" class="rounded border-border focus:ring-ring">
+                    <label for="privateRoom" class="text-sm">Make room private</label>
+                </div>
+                
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" id="cancelCreate" class="flex-1 border border-border text-foreground py-2 px-4 rounded-lg hover:bg-muted transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-primary text-primary-foreground py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors">
+                        Create Room
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: CreateRoomModal -->
+    
+    <!-- @COMPONENT: JoinRoomModal [room joining interface] -->
+    <div id="joinRoomModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-card rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold">Join Room</h3>
+                <button id="closeJoinModal" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="joinRoomForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Room Name</label>
+                    <input 
+                        type="text" 
+                        id="joinRoomNameInput"
+                        placeholder="Enter room name to join..."
+                        class="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                        required>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Your Display Name</label>
+                    <input 
+                        type="text" 
+                        id="displayNameInput"
+                        placeholder="How should others see you?"
+                        class="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                        required>
+                </div>
+                
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" id="cancelJoin" class="flex-1 border border-border text-foreground py-2 px-4 rounded-lg hover:bg-muted transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-primary text-primary-foreground py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors">
+                        Join Room
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: JoinRoomModal -->
+    
+    <!-- @COMPONENT: AdminControlsModal [admin management interface] -->
+    <div id="adminControlsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-card rounded-xl p-6 w-full max-w-lg mx-4 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold flex items-center space-x-2">
+                    <i class="fas fa-crown text-yellow-500"></i>
+                    <span>Admin Controls</span>
+                </h3>
+                <button id="closeAdminModal" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <!-- Room Settings -->
+                <div class="border border-border rounded-lg p-4">
+                    <h4 class="font-medium mb-3">Room Settings</h4>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm">Room Name</span>
+                            <span class="text-sm font-medium" data-bind="currentRoom.name">General Chat</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm">Created</span>
+                            <span class="text-sm text-muted-foreground">2 hours ago</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm">Members</span>
+                            <span class="text-sm">5 users</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Management -->
+                <div class="border border-border rounded-lg p-4">
+                    <h4 class="font-medium mb-3">User Management</h4>
+                    <div class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- User management list would be populated dynamically -->
+                        <div class="flex items-center justify-between p-2 hover:bg-muted rounded">
+                            <div class="flex items-center space-x-3">
+                                <img src="https://pixabay.com/get/gf109634174f4481e198e096dc56aa93d38682b53346a4a2d1ad55c458505571f58730bdc9163c9b37e452d30d4a6260a393a09be72f91f24fd464cddb74a30cb_1280.jpg" 
+                                     alt="User avatar" class="w-6 h-6 rounded-full object-cover">
+                                <span class="text-sm font-medium">Alice</span>
+                            </div>
+                            <div class="flex space-x-1">
+                                <button class="text-red-500 hover:bg-red-100 p-1 rounded text-xs" title="Block User">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                                <button class="text-orange-500 hover:bg-orange-100 p-1 rounded text-xs" title="Kick User">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Danger Zone -->
+                <div class="border border-red-200 bg-red-50 rounded-lg p-4">
+                    <h4 class="font-medium text-red-700 mb-3">Danger Zone</h4>
+                    <button class="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors">
+                        Delete Room
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AdminControlsModal -->
+    
+    <!-- @COMPONENT: ImagePreviewModal [full-screen image viewer] -->
+    <div id="imagePreviewModal" class="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center hidden" data-implementation="Show full-screen image preview">
+        <div class="relative max-w-4xl max-h-4xl mx-4">
+            <button id="closeImagePreview" class="absolute -top-10 right-0 text-white hover:text-gray-300">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+            <img id="previewImage" src="" alt="Preview" class="max-w-full max-h-full rounded-lg">
+        </div>
+    </div>
+    <!-- @END_COMPONENT: ImagePreviewModal -->
+    
+    <!-- @STATE: isTyping:boolean = false -->
+    <!-- @STATE: currentRoom:object = null -->
+    <!-- @STATE: currentUser:object = null -->
+    <!-- @STATE: rooms:array = [] -->
+    <!-- @STATE: messages:array = [] -->
+    <!-- @STATE: onlineUsers:array = [] -->
+    
+    <script>
+        // TODO: Implement Socket.io real-time communication
+        // TODO: Implement localStorage for message persistence
+        // TODO: Implement image upload and sharing functionality
+        // TODO: Implement user blocking/unblocking system
+        // TODO: Implement room creation and joining logic
+        // TODO: Implement admin controls and permissions
+        
+        (function() {
+            // Mobile menu functionality
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const sidebar = document.getElementById('sidebar');
+            const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+            const mobileOverlay = document.getElementById('mobileOverlay');
+            
+            function toggleSidebar() {
+                sidebar.classList.toggle('-translate-x-full');
+                mobileOverlay.classList.toggle('hidden');
+            }
+            
+            mobileMenuBtn.addEventListener('click', toggleSidebar);
+            closeSidebarBtn.addEventListener('click', toggleSidebar);
+            mobileOverlay.addEventListener('click', toggleSidebar);
+            
+            // Modal functionality
+            const modals = {
+                create: {
+                    modal: document.getElementById('createRoomModal'),
+                    openBtn: document.getElementById('createRoomBtn'),
+                    closeBtn: document.getElementById('closeCreateModal'),
+                    cancelBtn: document.getElementById('cancelCreate')
+                },
+                join: {
+                    modal: document.getElementById('joinRoomModal'),
+                    openBtn: document.getElementById('joinRoomBtn'),
+                    closeBtn: document.getElementById('closeJoinModal'),
+                    cancelBtn: document.getElementById('cancelJoin')
+                },
+                admin: {
+                    modal: document.getElementById('adminControlsModal'),
+                    openBtn: document.getElementById('adminControlsBtn'),
+                    closeBtn: document.getElementById('closeAdminModal')
+                }
+            };
+            
+            function openModal(modalName) {
+                modals[modalName].modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+            
+            function closeModal(modalName) {
+                modals[modalName].modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            }
+            
+            // Setup modal event listeners
+            Object.keys(modals).forEach(modalName => {
+                const modal = modals[modalName];
+                modal.openBtn.addEventListener('click', () => openModal(modalName));
+                modal.closeBtn.addEventListener('click', () => closeModal(modalName));
+                if (modal.cancelBtn) {
+                    modal.cancelBtn.addEventListener('click', () => closeModal(modalName));
+                }
+                
+                // Close on outside click
+                modal.modal.addEventListener('click', (e) => {
+                    if (e.target === modal.modal) {
+                        closeModal(modalName);
+                    }
+                });
+            });
+            
+            // Message input auto-resize
+            const messageInput = document.getElementById('messageInput');
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 128) + 'px';
+            });
+            
+            // Send message on Enter (but allow Shift+Enter for new line)
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    // TODO: Send message
+                    console.log('Sending message:', this.value);
+                    this.value = '';
+                    this.style.height = 'auto';
+                }
+            });
+            
+            // Send button functionality
+            document.getElementById('sendMessageBtn').addEventListener('click', function() {
+                const message = messageInput.value.trim();
+                if (message) {
+                    // TODO: Send message via Socket.io
+                    console.log('Sending message:', message);
+                    messageInput.value = '';
+                    messageInput.style.height = 'auto';
+                }
+            });
+            
+            // Users list toggle for mobile
+            const usersToggleBtn = document.getElementById('usersToggleBtn');
+            const usersList = document.getElementById('usersList');
+            
+            usersToggleBtn?.addEventListener('click', function() {
+                usersList.classList.toggle('hidden');
+            });
+            
+            // Auto-scroll to bottom of messages
+            const messagesContainer = document.getElementById('messagesContainer');
+            function scrollToBottom() {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            // Initialize
+            scrollToBottom();
+            
+            // Form submissions
+            document.getElementById('createRoomForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const roomName = document.getElementById('roomNameInput').value;
+                const roomDesc = document.getElementById('roomDescInput').value;
+                const isPrivate = document.getElementById('privateRoom').checked;
+                
+                // TODO: Create room via Socket.io
+                console.log('Creating room:', { roomName, roomDesc, isPrivate });
+                closeModal('create');
+            });
+            
+            document.getElementById('joinRoomForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const roomName = document.getElementById('joinRoomNameInput').value;
+                const displayName = document.getElementById('displayNameInput').value;
+                
+                // TODO: Join room via Socket.io
+                console.log('Joining room:', { roomName, displayName });
+                closeModal('join');
+            });
+            
+            // TODO: Implement real-time features:
+            // - Socket.io connection and event handlers
+            // - Message sending and receiving
+            // - User join/leave notifications
+            // - Typing indicators
+            // - Image upload and sharing
+            // - Admin controls (blocking/unblocking users)
+            // - localStorage for message persistence
+            // - Room management (create/join/leave)
+            
+        })();
+    </script>
+</body>
+</html>
