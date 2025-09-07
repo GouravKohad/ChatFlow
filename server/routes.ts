@@ -50,9 +50,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
    </url>
 </urlset>`;
 
-    res.header('Content-Type', 'application/xml');
+    res.setHeader('Content-Type', 'application/xml');
     res.send(sitemap);
 });
+
   // Health check endpoint for deployment monitoring
   app.get('/health', (req, res) => {
     res.status(200).json({ 
