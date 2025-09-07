@@ -598,14 +598,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   function broadcastToAll(message: any, excludeSocketId?: string) {
+    let broadcastCount = 0;
     clients.forEach((socketData, socketId) => {
       if (socketId !== excludeSocketId && socketData.userId) {
         const socket = io.sockets.sockets.get(socketId);
         if (socket && socket.connected) {
           socket.emit('message', message);
+          broadcastCount++;
         }
       }
     });
+    console.log(`Broadcasted ${message.type} to ${broadcastCount} authenticated users`);
   }
 
   function broadcastUserLeft(socketData: SocketData) {
