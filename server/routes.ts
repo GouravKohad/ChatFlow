@@ -270,7 +270,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         room: room
       });
 
-      broadcastToAll({ type: 'room_list_updated', rooms: await storage.getAllRooms() });
+      // Get fresh room list and broadcast to all authenticated users
+      const allRooms = await storage.getAllRooms();
+      console.log(`Broadcasting room_list_updated to ${clients.size} connected clients after creating room "${room.name}"`);
+      broadcastToAll({ type: 'room_list_updated', rooms: allRooms });
 
     } catch (error) {
       socket.emit('message', { type: 'error', message: 'Failed to create room' });
@@ -596,9 +599,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   function broadcastToAll(message: any, excludeSocketId?: string) {
     clients.forEach((socketData, socketId) => {
-      if (socketId !== excludeSocketId) {
+      if (socketId !== excludeSocketId && socketData.userId) {
         const socket = io.sockets.sockets.get(socketId);
-        if (socket) {
+        if (socket && socket.connected) {
           socket.emit('message', message);
         }
       }
